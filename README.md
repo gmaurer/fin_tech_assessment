@@ -1,3 +1,3 @@
 # fin_tech_assessment
 ## Improvements with more time: 
-- dockerize script to allow this to be set up on any environment since it would be self contained
+- dockerize script to allow this to be set up on any environment since it would be self contained, this project was set up to facilitate a shift to containers
