@@ -38,17 +38,29 @@ class HandleData:
                 
             timestamp = x["timestamp"]
             print("BEFORE LOGS")
+            index_count = 0
             if self.buy_count >= int(self.target_size):
                 print("BUY")
                 temp_buy_df = self.df.sort_values("price")
                 print(temp_buy_df)
-                money_spent = 
+                money_spent = 0
                 print(f"{timestamp} B {self.target_size}")
             if self.sell_count >= int(self.target_size):
                 print("SELL")
                 temp_sell_df = self.df.sort_values("price", ascending=False)
                 print(temp_sell_df)
-                money_made = 
+                money_made = 0
+                target_size_diff = self.target_size
+                while True:
+                    for index, row in temp_sell_df.iterrows():
+                         
+                        if int(row["size"]) <= target_size_diff:
+                            money_made = int(row["size"]) * int(row["price"])
+                            target_size_diff -= int(row["size"])
+                        else:
+                            int(row["price"]) * (target_size_diff - self.target_size)
+                            break
+
                 print(f"{timestamp} S {self.target_size}")
             print("AFTER LOGS")
 
