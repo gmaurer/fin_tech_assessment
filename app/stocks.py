@@ -15,7 +15,6 @@ class HandleData:
         test_data = self.data[:10]
         for x in test_data:
             if x["message"] == "A":
-                print("ADD")
                 self.df.loc[len(self.df)] = x
                 if x["side"] == "B":
                     self.buy_count += int(x["size"])
@@ -23,7 +22,6 @@ class HandleData:
                     self.sell_count += int(x["size"]) 
 
             elif x["message"] == "R":  
-                print("REDUCE")
                 y = self.df.loc[self.df.order_id == x["order_id"]]
                 size_post_reduction = int(y.to_dict('records')[0]["size"]) - int(x["size"])
                 if y.to_dict('records')[0]["side"] == "B":
@@ -37,38 +35,44 @@ class HandleData:
                     self.df.loc[self.df["order_id"] == x["order_id"], "size"] = size_post_reduction
                 
             timestamp = x["timestamp"]
-            print("BEFORE LOGS")
             index_count = 0
-            if self.buy_count >= int(self.target_size):
-                print("BUY")
+            if self.buy_count >= int(self.target_size) and x["side"] == "B":
                 temp_buy_df = self.df.sort_values("price")
-                print(temp_buy_df)
-                money_spent = 0
-                print(f"{timestamp} B {self.target_size}")
-            if self.sell_count >= int(self.target_size):
-                print("SELL")
+                money_spent = 0.0
+                target_size_diff = 0
+                increase_b = int(self.target_size)
+                for index, row in temp_buy_df.iterrows():
+                    
+                    increase_b = increase_b- target_size_diff
+                    if increase_b <=0:
+                        break
+                    target_size_diff += int(row["size"])
+
+                    if target_size_diff >= int(self.target_size):
+                        money_spent = money_spent + (increase_b * float(row["price"]))
+                    elif target_size_diff < int(self.target_size):
+                        money_spent = money_spent + (target_size_diff * float(row["price"]))
+                print(f"{timestamp} S {money_spent}")
+            if self.sell_count >= int(self.target_size) and x["side"] == "S":
                 temp_sell_df = self.df.sort_values("price", ascending=False)
-                print(temp_sell_df)
-                money_made = 0
-                target_size_diff = self.target_size
-                while True:
-                    for index, row in temp_sell_df.iterrows():
-                         
-                        if int(row["size"]) <= target_size_diff:
-                            money_made = int(row["size"]) * int(row["price"])
-                            target_size_diff -= int(row["size"])
-                        else:
-                            int(row["price"]) * (target_size_diff - self.target_size)
-                            break
+                money_made = 0.0
+                target_size_diff = 0
+                increase = int(self.target_size)
+                for index, row in temp_sell_df.iterrows():
+                    
+                    increase = increase- target_size_diff
+                    if increase <=0:
+                        break
+                    target_size_diff += int(row["size"])
 
-                print(f"{timestamp} S {self.target_size}")
-            print("AFTER LOGS")
+                    if target_size_diff >= int(self.target_size):
+                        money_made = money_made + (increase * float(row["price"]))
+                    elif target_size_diff < int(self.target_size):
+                        money_made = money_made + (target_size_diff * float(row["price"]))
+                        
+                    
 
-
-                
-
-        print(self.df)
-
+                print(f"{timestamp} B {money_made}")
 
     def parse_object1(self):
         test_data = self.data[:10]
