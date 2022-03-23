@@ -26,6 +26,13 @@ class HandleData:
             reduce_log = None
         return(reduce_logging, reduce_log)
 
+    def reduce_count(self, dataframe, record_of_order_id, buy_or_sell:str):
+        if dataframe.to_dict('records')[0]["side"] == buy_or_sell:   
+            if buy_or_sell == "S":
+                self.sell_count -= int(record_of_order_id["size"])
+            else:
+                self.buy_count -= int(record_of_order_id["size"])
+
     def loop_sorted_dataframe(self,dataframe, target_size_diff:int, money:float, buy_or_sell:str):
         increase = int(self.target_size)
         for index, row in dataframe.iterrows():
@@ -71,10 +78,8 @@ class HandleData:
                 reduce_logging_buy,reduce_log_buy = self.na_logging_handler(y, "B")
                 reduce_logging_sell,reduce_log_sell = self.na_logging_handler(y, "S")                
                 size_post_reduction = int(y.to_dict('records')[0]["size"]) - int(x["size"])
-                if y.to_dict('records')[0]["side"] == "B":
-                    self.buy_count -= int(x["size"])
-                if y.to_dict('records')[0]["side"] == "S":   
-                    self.sell_count -= int(x["size"])
+                self.reduce_count(y, x, "B")
+                self.reduce_count(y, x, "S")
                 if size_post_reduction <= 0:
                     self.df = self.df[self.df.order_id != x["order_id"]]
                     self.df = self.df.reset_index(drop=True)
