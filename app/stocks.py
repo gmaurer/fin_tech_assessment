@@ -35,7 +35,7 @@ class HandleData:
 
     def loop_sorted_dataframe(self,dataframe, target_size_diff:int, money:float, buy_or_sell:str):
         increase = int(self.target_size)
-        for index, row in dataframe.iterrows():
+        for inderecord, row in dataframe.iterrows():
             if row["side"] == buy_or_sell:
                 increase = increase - target_size_diff
                 if increase <=0:
@@ -62,31 +62,31 @@ class HandleData:
 
     def parse_object(self):
         test_data = self.data[:100]
-        for x in test_data:
-            self.timestamp = x["timestamp"]
+        for record in test_data:
+            self.timestamp = record["timestamp"]
             reduce_logging_buy = False
             reduce_logging_sell = False
-            if x["message"] == "A":
-                self.df.loc[len(self.df)] = x
-                if x["side"] == "B":
-                    self.buy_count += int(x["size"])
-                if x["side"] == "S":   
-                    self.sell_count += int(x["size"]) 
+            if record["message"] == "A":
+                self.df.loc[len(self.df)] = record
+                if record["side"] == "B":
+                    self.buy_count += int(record["size"])
+                if record["side"] == "S":   
+                    self.sell_count += int(record["size"]) 
 
-            elif x["message"] == "R":
-                y = self.df.loc[self.df.order_id == x["order_id"]]  
-                reduce_logging_buy,reduce_log_buy = self.na_logging_handler(y, "B")
-                reduce_logging_sell,reduce_log_sell = self.na_logging_handler(y, "S")                
-                size_post_reduction = int(y.to_dict('records')[0]["size"]) - int(x["size"])
-                self.reduce_count(y, x, "B")
-                self.reduce_count(y, x, "S")
+            elif record["message"] == "R":
+                record_to_reduce = self.df.loc[self.df.order_id == record["order_id"]]  
+                reduce_logging_buy,reduce_log_buy = self.na_logging_handler(record_to_reduce, "B")
+                reduce_logging_sell,reduce_log_sell = self.na_logging_handler(record_to_reduce, "S")                
+                size_post_reduction = int(record_to_reduce.to_dict('records')[0]["size"]) - int(record["size"])
+                self.reduce_count(record_to_reduce, record, "B")
+                self.reduce_count(record_to_reduce, record, "S")
                 if size_post_reduction <= 0:
-                    self.df = self.df[self.df.order_id != x["order_id"]]
+                    self.df = self.df[self.df.order_id != record["order_id"]]
                     self.df = self.df.reset_index(drop=True)
                 else:
-                    self.df.loc[self.df["order_id"] == x["order_id"], "size"] = size_post_reduction
+                    self.df.loc[self.df["order_id"] == record["order_id"], "size"] = size_post_reduction
                             
-            self.handle_stock_price_calculation(x)
+            self.handle_stock_price_calculation(record)
             if reduce_logging_buy:
                 logging.info(reduce_log_buy)
             if reduce_logging_sell:
