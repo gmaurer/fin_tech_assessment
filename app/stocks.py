@@ -1,20 +1,64 @@
 import pandas as pd
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 class HandleData:
 
     def __init__(self,data_list: list, target_size: int):
         self.data = data_list
         self.target_size = target_size
-        self.sell_group = []
-        self.buy_group = []
         self.buy_count = 0
         self.sell_count = 0
+        self.timestamp = None
         self.df = pd.DataFrame(columns=["timestamp", "message", "order_id", "side", "price", "size"]) 
 
-    def parse_object(self):
-        test_data = self.data[:50]
-        for x in test_data:
+    def na_logging_handler(self, record_of_order_id, buy_or_sell:str):
+        if buy_or_sell == "S":
+            count = self.sell_count
+        else:
+            count = self.buy_count
+        if count >= int(self.target_size) and record_of_order_id.to_dict('records')[0]["side"] == "S":
+            reduce_logging = True
+            reduce_log = f"{self.timestamp} B NA"
+        else:
             reduce_logging = False
+            reduce_log = None
+        return(reduce_logging, reduce_log)
+
+    def loop_sorted_dataframe(self,dataframe, target_size_diff:int, money:float, buy_or_sell:str):
+        increase = int(self.target_size)
+        for index, row in dataframe.iterrows():
+            if row["side"] == buy_or_sell:
+                increase = increase - target_size_diff
+                if increase <=0:
+                    break
+                target_size_diff += int(row["size"])
+                
+                if target_size_diff >= int(self.target_size):
+                    money = money + (increase * float(row["price"]))
+                elif target_size_diff < int(self.target_size):
+                    money = money + (target_size_diff * float(row["price"]))
+        return(money)
+
+    def handle_stock_price_calculation(self, data_record:str):
+        if self.buy_count >= int(self.target_size) and data_record["side"] == "B":
+            reduce_logging_buy = False
+            temp_buy_df = self.df.sort_values("price", ascending=False)
+            money_spent = self.loop_sorted_dataframe(temp_buy_df, 0, 0.0, "B")
+            logging.info(f"{self.timestamp} S {money_spent}")
+        elif self.sell_count >= int(self.target_size) and data_record["side"] == "S":
+            reduce_logging_sell = False
+            temp_sell_df = self.df.sort_values("price")
+            money_made = self.loop_sorted_dataframe(temp_sell_df, 0, 0.0, "S")
+            logging.info(f"{self.timestamp} B {money_made}")
+
+    def parse_object(self):
+        test_data = self.data[:100]
+        for x in test_data:
+            self.timestamp = x["timestamp"]
+            reduce_logging_buy = False
+            reduce_logging_sell = False
             if x["message"] == "A":
                 self.df.loc[len(self.df)] = x
                 if x["side"] == "B":
@@ -24,15 +68,8 @@ class HandleData:
 
             elif x["message"] == "R":
                 y = self.df.loc[self.df.order_id == x["order_id"]]  
-                if self.buy_count >= int(self.target_size) and y.to_dict('records')[0]["side"] == "B":
-                    reduce_logging = True
-                    buy_timestamp = x["timestamp"]
-                    reduce_log = f"{buy_timestamp} S NA"
-                elif self.sell_count >= int(self.target_size) and y.to_dict('records')[0]["side"] == "S":
-                    reduce_logging = True
-                    sell_timestamp = x["timestamp"]
-                    reduce_log = f"{sell_timestamp} B NA"
-                
+                reduce_logging_buy,reduce_log_buy = self.na_logging_handler(y, "B")
+                reduce_logging_sell,reduce_log_sell = self.na_logging_handler(y, "S")                
                 size_post_reduction = int(y.to_dict('records')[0]["size"]) - int(x["size"])
                 if y.to_dict('records')[0]["side"] == "B":
                     self.buy_count -= int(x["size"])
@@ -43,79 +80,12 @@ class HandleData:
                     self.df = self.df.reset_index(drop=True)
                 else:
                     self.df.loc[self.df["order_id"] == x["order_id"], "size"] = size_post_reduction
-                
-            timestamp = x["timestamp"]
-            index_count = 0
-            if self.buy_count >= int(self.target_size) and x["side"] == "B":
-                reduce_logging = False
-                temp_buy_df = self.df.sort_values("price", ascending=False)
-                money_spent = 0.0
-                target_size_diff = 0
-                increase_b = int(self.target_size)
-                for index, row in temp_buy_df.iterrows():
-                    if row["side"] == "B":
-                        increase_b = increase_b- target_size_diff
-                        if increase_b <=0:
-                            break
-                        target_size_diff += int(row["size"])
-                        
-                        if target_size_diff >= int(self.target_size):
-                            money_spent = money_spent + (increase_b * float(row["price"]))
-                        elif target_size_diff < int(self.target_size):
-                            money_spent = money_spent + (target_size_diff * float(row["price"]))
-                print(f"{timestamp} S {money_spent}")
-            elif self.sell_count >= int(self.target_size) and x["side"] == "S":
-                reduce_logging = False
-                temp_sell_df = self.df.sort_values("price")
-                money_made = 0.0
-                target_size_diff = 0
-                increase = int(self.target_size)
-                for index, row in temp_sell_df.iterrows():
-                    if row["side"] == "S":
-                        increase = increase- target_size_diff
-                        if increase <=0:
-                            break
-                        target_size_diff += int(row["size"])
-
-                        if target_size_diff >= int(self.target_size):
-                            money_made = money_made + (increase * float(row["price"]))
-                        elif target_size_diff < int(self.target_size):
-                            money_made = money_made + (target_size_diff * float(row["price"]))
                             
-                print(f"{timestamp} B {money_made}")
-            if reduce_logging:
-                print(reduce_log)
-
-    def parse_object1(self):
-        test_data = self.data[:10]
-        for x in test_data:
-            print("_____")
-            print(x)
-            if x["message"] == "A":
-                print("Add")
-                if x["side"] == "B":
-                    print("BUY Order")
-                    self.buy_group.append(x)
-                else:
-                    print("SELL Order")
-                    self.buy_group.append(x)
-                    #self.buy_group[x["order_id"]] = x
-                self.buy_group = sorted(self.buy_group, key=lambda price: float(price["price"]))
-
-            elif x["message"] == "R":
-                print("R")
-                """ if int(x["size"]) - int(self.buy_group[x["order_id"]].get("size")) <= 0:
-                    print("Remove")
-                    self.buy_group.pop(x["order_id"], "not_found")
-                else:
-                    print("Reduce")
-                    y = self.buy_group[x["order_id"]].get("size")
-                    self.buy_group[x["order_id"]]["size"] = y- x["size"] """
-                #self.sell_group.pop(x["order_id"], "not_found")
-        print("END")
-        print(self.sell_group)
-        print(self.buy_group)
-         
+            self.handle_stock_price_calculation(x)
+            if reduce_logging_buy:
+                logging.info(reduce_log_buy)
+            if reduce_logging_sell:
+                logging.info(reduce_log_sell)
 
             
     
