@@ -28,21 +28,22 @@ class PrepareData:
         
         with gzip.open(path, 'rt') as f_in:
             for x in f_in:
-                new_record = BookRecord(x.split())
-                self.unzip_list.append(new_record.__dict__) 
-
-
-class BookRecord:
-    def __init__(self, raw_record: list):
-        
-        self.timestamp = raw_record[0]
-        self.message = raw_record[1]
-        self.order_id = raw_record[2] 
-        self.side = raw_record[3] if len(raw_record) == 6 else None
-        self.price = raw_record[4] if len(raw_record) == 6 else None
-        self.size = raw_record[5] if len(raw_record) == 6 else raw_record[3]
-
-
+                raw_record = x.split()
+                new_record = {
+                    "timestamp":raw_record[0],
+                    "message":raw_record[1],
+                    "order_id":raw_record[2],
+                    "side":raw_record[3] if len(raw_record) == 6 else None,
+                    "price":raw_record[4] if len(raw_record) == 6 else None,
+                    "size":raw_record[5] if len(raw_record) == 6 else raw_record[3]
+                }
+                try:
+                    self.unzip_list.append(new_record) 
+                except:
+                    "Bad Record, proceeding to next"
 
 if __name__ == "__main__":
+    import time
+    start_time = time.time()
     prepare = PrepareData()
+    print("--- %s seconds ---" % (time.time() - start_time))

@@ -10,17 +10,26 @@ class HandleData:
         self.target_size = target_size
         self.buy_count = 0
         self.sell_count = 0
+        self.previous_buy_count = 0
+        self.previous_sell_count = 0
         self.timestamp = None
+        self.previous_sell_amount = None
+        self.previous_buy_amount = None
+        self.previous_timestamp = None
         self.df = pd.DataFrame(columns=["timestamp", "message", "order_id", "side", "price", "size"]) 
+        self.log_list = []
 
     def na_logging_handler(self, record_of_order_id, buy_or_sell:str):
+        
         if buy_or_sell == "S":
-            count = self.sell_count
+            opposite = "B"
+            count = self.previous_sell_count
         else:
-            count = self.buy_count
-        if count >= int(self.target_size) and record_of_order_id.to_dict('records')[0]["side"] != buy_or_sell:
+            opposite = "S"
+            count = self.previous_buy_count
+        if count >= int(self.target_size) and record_of_order_id.to_dict('records')[0]["side"] == buy_or_sell:
             reduce_logging = True
-            reduce_log = f"{self.timestamp} {buy_or_sell} NA"
+            reduce_log = f"{self.timestamp} {opposite} NA"
         else:
             reduce_logging = False
             reduce_log = None
@@ -47,22 +56,37 @@ class HandleData:
                 elif target_size_diff < int(self.target_size):
                     money = money + (target_size_diff * float(row["price"]))
         return(money)
+    
+    def check_previous_amount(self, current_amount:float, current_side:str, log:str):
+        if current_side == "S":
+            if self.previous_sell_amount != current_amount:
+                print(log)
+                self.log_list.append(log)
+                self.previous_sell_amount = current_amount
+        elif current_side == "B":
+            if self.previous_buy_amount != current_amount:
+                print(log)
+                self.log_list.append(log)
+                self.previous_buy_amount = current_amount
+        self.previous_timestamp = self.timestamp
 
     def handle_stock_price_calculation(self, data_record:str):
         if self.buy_count >= int(self.target_size) and data_record["side"] == "B":
             reduce_logging_buy = False
             temp_buy_df = self.df.sort_values("price", ascending=False)
             money_spent = self.loop_sorted_dataframe(temp_buy_df, 0, 0.0, "B")
-            logging.info(f"{self.timestamp} S {money_spent}")
+            self.check_previous_amount(money_spent, "S", f"{self.timestamp} S {money_spent}")
         elif self.sell_count >= int(self.target_size) and data_record["side"] == "S":
             reduce_logging_sell = False
             temp_sell_df = self.df.sort_values("price")
             money_made = self.loop_sorted_dataframe(temp_sell_df, 0, 0.0, "S")
-            logging.info(f"{self.timestamp} B {money_made}")
+            self.check_previous_amount(money_made, "B", f"{self.timestamp} B {money_made}")
 
     def parse_object(self):
-        test_data = self.data[:100]
-        for record in test_data:
+        test_record = self.data[:100]
+        for record in test_record:
+            self.previous_buy_count = self.buy_count
+            self.previous_sell_count = self.sell_count
             self.timestamp = record["timestamp"]
             reduce_logging_buy = False
             reduce_logging_sell = False
@@ -90,19 +114,20 @@ class HandleData:
                 temp_sell_df = temp.sort_values("price")
                 if reduce_side == "S" and temp_sell_df.size != 0 and self.sell_count >= int(self.target_size):
                     money = self.loop_sorted_dataframe(temp_sell_df, 0, 0.0, "S")
-                    logging.info(f"{self.timestamp} S {money}")
+                    self.check_previous_amount(money, "B", f"{self.timestamp} B {money}")
                 elif reduce_side == "B" and temp_buy_df.size != 0 and self.buy_count >= int(self.target_size):
                     money = self.loop_sorted_dataframe(temp_buy_df, 0, 0.0, "B")
-                    logging.info(f"{self.timestamp} B {money}")
+                    self.check_previous_amount(money, "S", f"{self.timestamp} S {money}")
                 else:
                     reduce_logging_buy,reduce_log_buy = self.na_logging_handler(record_to_reduce, "B")
                     reduce_logging_sell,reduce_log_sell = self.na_logging_handler(record_to_reduce, "S")
                             
             self.handle_stock_price_calculation(record)
             if reduce_logging_buy:
-                logging.info(reduce_log_buy)
+                self.check_previous_amount(0.0, "S", reduce_log_buy)
             if reduce_logging_sell:
-                logging.info(reduce_log_sell)
+                self.check_previous_amount(0.0, "B", reduce_log_sell)
+        #print(self.log_list)
 
             
     
