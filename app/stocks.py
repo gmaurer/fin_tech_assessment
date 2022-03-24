@@ -83,8 +83,7 @@ class HandleData:
             self.check_previous_amount(money_made, "B", f"{self.timestamp} B {money_made}")
 
     def parse_object(self):
-        test_record = self.data[:100]
-        for record in test_record:
+        for record in self.data:
             self.previous_buy_count = self.buy_count
             self.previous_sell_count = self.sell_count
             self.timestamp = record["timestamp"]
