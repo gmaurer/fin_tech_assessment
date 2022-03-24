@@ -18,9 +18,9 @@ class HandleData:
             count = self.sell_count
         else:
             count = self.buy_count
-        if count >= int(self.target_size) and record_of_order_id.to_dict('records')[0]["side"] == "S":
+        if count >= int(self.target_size) and record_of_order_id.to_dict('records')[0]["side"] != buy_or_sell:
             reduce_logging = True
-            reduce_log = f"{self.timestamp} B NA"
+            reduce_log = f"{self.timestamp} {buy_or_sell} NA"
         else:
             reduce_logging = False
             reduce_log = None
@@ -74,9 +74,8 @@ class HandleData:
                     self.sell_count += int(record["size"]) 
 
             elif record["message"] == "R":
-                record_to_reduce = self.df.loc[self.df.order_id == record["order_id"]]  
-                reduce_logging_buy,reduce_log_buy = self.na_logging_handler(record_to_reduce, "B")
-                reduce_logging_sell,reduce_log_sell = self.na_logging_handler(record_to_reduce, "S")                
+                record_to_reduce = self.df.loc[self.df.order_id == record["order_id"]]
+                reduce_side = record_to_reduce.to_dict('records')[0]["side"]
                 size_post_reduction = int(record_to_reduce.to_dict('records')[0]["size"]) - int(record["size"])
                 self.reduce_count(record_to_reduce, record, "B")
                 self.reduce_count(record_to_reduce, record, "S")
@@ -85,6 +84,19 @@ class HandleData:
                     self.df = self.df.reset_index(drop=True)
                 else:
                     self.df.loc[self.df["order_id"] == record["order_id"], "size"] = size_post_reduction
+                temp = self.df.loc[self.df['side'] == reduce_side]
+
+                temp_buy_df = temp.sort_values("price", ascending=False)
+                temp_sell_df = temp.sort_values("price")
+                if reduce_side == "S" and temp_sell_df.size != 0 and self.sell_count >= int(self.target_size):
+                    money = self.loop_sorted_dataframe(temp_sell_df, 0, 0.0, "S")
+                    logging.info(f"{self.timestamp} S {money}")
+                elif reduce_side == "B" and temp_buy_df.size != 0 and self.buy_count >= int(self.target_size):
+                    money = self.loop_sorted_dataframe(temp_buy_df, 0, 0.0, "B")
+                    logging.info(f"{self.timestamp} B {money}")
+                else:
+                    reduce_logging_buy,reduce_log_buy = self.na_logging_handler(record_to_reduce, "B")
+                    reduce_logging_sell,reduce_log_sell = self.na_logging_handler(record_to_reduce, "S")
                             
             self.handle_stock_price_calculation(record)
             if reduce_logging_buy:
